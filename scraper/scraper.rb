@@ -50,9 +50,6 @@ class Scraper
     end
     def get_cars
         scrape_cars
-        # @cars.each do |car|
-        #     puts car.to_s
-        # end
         write_to_csv
     end
 end
