@@ -20,13 +20,14 @@ class Scraper
         html_cars.each do |html_car|
             car = scrape_car(html_car)
             @cars.push(car)
-    end
+        end
     end
     def scrape_car(car)
         # url = car.css("div")[1].css("h1").css("a").first.attribute("href").value
         url = car.css("div h1 a").first.attribute("href").value
         name = car.css('h1').css('a').first.text
-        image = car.css('div')[0].css('img').first.attribute('src').value
+        image = car.css("div")[0].css("img").first.attribute("src").value
+        # image = car.css("div img").first.attribute("src").value
         price = car.css('div h3').text
         info = scrape_info(url)
         Car.new(url,image,name,price,info)
