@@ -1,62 +1,52 @@
-require "prawn"
-require "prawn/table"
+require 'csv'
+require 'prawn'
+require 'net/http'
+require 'net/https'
+require 'uri'
+require 'prawn/table'
 
-# class Generator
-#     def initialize(csv_path,output_path)
-#         @csv_path = csv_path
-#         @output_path = output_path
-#         @data=[]
-#         @download_image=[]
-#     end
-#     def generate_pdf
-#         csv_text=File.read(@csv_path)
-#         csv = CSV.parse(csv_text,headers: false)
-#         pdf = Prawn::Document.new
-        
-#     end
-# end
-
-class Generator
-    def initialize(csv_file_path,pdf_output_path)
+class Pdf
+    def initialize(csv_file_path,pdf_file_path)
         @csv_file_path = csv_file_path
-        @pdf_output_path = pdf_output_path
+        @pdf_file_path = pdf_file_path
+        @data = []
+        @downloaded_files = []
     end
-
-    def convert
-        Prawn::Document.generate(@pdf_output_path) do
-            font_size 14
-            table pdf_data,header: false do
-                row(0).font_style= :bold
+    def generate_pdf
+        csv_text = File.read(@csv_file_path)
+        csv = CSV.parse(csv_text.scrub)
+        pdf = Prawn::Document.new
+        counter = 1
+        csv.each do |row|
+            if row[1]=~URI::regexp
+                add_image_row(row,counter)
+                # add_row(row)
+                counter+=1
+            else
+                add_row(row)
             end
         end
+        pdf.table(@data, header: false,column_widths: {0 => 120, 1 => 100, 2 => 70})
+        pdf.render_file(@pdf_file_path)
+        @downloaded_files.each do |file|
+            File.delete(file)
+        end
     end
-
-    def pdf_data
-        data=[]
-        CSV.foreach(@csv_file_path) do |row|
-            row_data = row.to_h.values.map do |value|
-                if value.start_with?('http')
-                    image_path = download_image(value)
-                    image_tag(image_path)
-                else
-                    value
-                end
+    def add_row(row_data)
+        @data << row_data
+    end
+    def add_image_row(row,counter)
+        img_url = URI.extract(row[1])[0]
+        uri = URI(img_url)
+        Net::HTTP.start(uri.host,uri.port, :use_ssl => uri.scheme == 'https') do |http|
+            # http.use_ssl = true 
+            resp = http.get(uri.path)
+            file_name = "#{counter}_#{File.basename(uri.path)}"
+            File.open(file_name,"wb") do |file|
+                file.write(resp.body)
             end
-            data << row_data
+            @downloaded_files << file_name
+            @data << [{image: file_name,fit: [100,100]},row[2],row[3],row[4],row[5],row[6],row[7]]
         end
-        data.unshift(CSV.open(@csv_file_path,'r',&readline).chomp.split(","))
-        data
-    end
-
-    def download_image(url)
-        image_data = open(url, allow_redirections: :all).read
-        Tempfile.open(['image','.jpg'],'wb') do |file|
-            file.write(image_data)
-            file.csv_path
-        end
-    end
-    
-    def image_tag(image_path)
-    {image: image_path,fit:[80,80]}
     end
 end
